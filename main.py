@@ -17,21 +17,22 @@ def contrastive_loss(v1, v2):
   return CE(logits, labels) + CE(torch.transpose(logits, 0, 1), labels)
 
 model_name = 'distilbert-base-uncased'
-tokenizer = AutoTokenizer.from_pretrained(model_name)
+#model_name = 'seyonec/ChemBERTa-zinc-base-v1'
+tokenizer = AutoTokenizer.from_pretrained(model_name, from_tf=True)
 gt = np.load("./data/token_embedding_dict.npy", allow_pickle=True)[()]
 val_dataset = GraphTextDataset(root='./data/', gt=gt, split='val', tokenizer=tokenizer)
 train_dataset = GraphTextDataset(root='./data/', gt=gt, split='train', tokenizer=tokenizer)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-nb_epochs = 5
+nb_epochs = 10
 batch_size = 32
 learning_rate = 2e-5
 
 val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
-model = Model(model_name=model_name, num_node_features=300, nout=768, nhid=300, graph_hidden_channels=300) # nout = bert model hidden dim
+model = Model(model_name=model_name, num_node_features=300, nout=768, nhid=300, graph_hidden_channels=[500,400,300]) # nout = bert model hidden dim
 model.to(device)
 
 optimizer = optim.AdamW(model.parameters(), lr=learning_rate,
@@ -43,7 +44,7 @@ loss = 0
 losses = []
 count_iter = 0
 time1 = time.time()
-printEvery = 50
+printEvery = 200
 best_validation_loss = 1000000
 
 for i in range(nb_epochs):
@@ -59,7 +60,7 @@ for i in range(nb_epochs):
         x_graph, x_text = model(graph_batch.to(device), 
                                 input_ids.to(device), 
                                 attention_mask.to(device))
-        current_loss = contrastive_loss(x_graph, x_text)   
+        current_loss = contrastive_loss(x_graph, x_text)
         optimizer.zero_grad()
         current_loss.backward()
         optimizer.step()
@@ -83,7 +84,7 @@ for i in range(nb_epochs):
         x_graph, x_text = model(graph_batch.to(device), 
                                 input_ids.to(device), 
                                 attention_mask.to(device))
-        current_loss = contrastive_loss(x_graph, x_text)   
+        current_loss = contrastive_loss(x_graph, x_text)
         val_loss += current_loss.item()
     best_validation_loss = min(best_validation_loss, val_loss)
     print('-----EPOCH'+str(i+1)+'----- done.  Validation loss: ', str(val_loss/len(val_loader)) )
