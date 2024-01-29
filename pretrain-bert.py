@@ -1,4 +1,4 @@
-from transformers import DistilBertTokenizer, DistilBertForMaskedLM
+from transformers import DistilBertTokenizer, DistilBertForMaskedLM, get_linear_schedule_with_warmup
 from transformers import DataCollatorForLanguageModeling
 from torch.utils.data import DataLoader
 from dataloader import TextDataset
@@ -13,7 +13,7 @@ tokenizer = DistilBertTokenizer.from_pretrained(model_name)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-nb_epochs = 50
+epochs = 5
 batch_size = 32
 learning_rate = 2e-5
 
@@ -35,7 +35,7 @@ train_loader = DataLoader(
 val_loader = DataLoader(
     val_dataset,
     batch_size=batch_size,
-    shuffle=True,
+    shuffle=False,
     collate_fn=data_collator
 )
 
@@ -47,10 +47,15 @@ optimizer = torch.optim.AdamW(
     lr=5e-5
 )
 
-epochs = 5 
-time1 = time.time()
-printEvery = 200
-count_iter = 0
+total_steps = len(train_loader) * epochs
+
+scheduler = get_linear_schedule_with_warmup(
+    optimizer,
+    num_warmup_steps=0.1 * total_steps,  # 10% of total steps
+    num_training_steps=total_steps
+)
+
+min_val_loss = float('inf')
 for epoch in range(epochs):  # Number of epochs
     # Training loop
     model.train()
@@ -61,11 +66,13 @@ for epoch in range(epochs):  # Number of epochs
         loss = outputs.loss
         loss.backward()
         optimizer.step()
+        scheduler.step()
         optimizer.zero_grad()
         total_train_loss += loss.item()
         
     avg_train_loss = total_train_loss / len(train_loader)
-    print(f"Epoch: {epoch}, Training Loss: {avg_train_loss}")
+    current_lr = optimizer.param_groups[0]['lr']
+    print(f"Epoch: {epoch}, Training Loss: {avg_train_loss:.4f}, Learning Rate: {current_lr}")
 
     # Validation loop
     model.eval()
@@ -78,4 +85,11 @@ for epoch in range(epochs):  # Number of epochs
             total_val_loss += loss.item()
 
     avg_val_loss = total_val_loss / len(val_loader)
-    print(f"Epoch: {epoch}, Validation Loss: {avg_val_loss}")
+    print(f"Epoch: {epoch}, Validation Loss: {avg_val_loss:.4f}")
+    
+    # Check if this is the best model so far
+    if avg_val_loss < min_val_loss:
+        print(f"Validation loss decreased ({min_val_loss:.4f} --> {avg_val_loss:.4f}). Saving model...")
+        min_val_loss = avg_val_loss
+        # Save the model
+        torch.save(model.state_dict(), './distilbert_pretrained.bin')
