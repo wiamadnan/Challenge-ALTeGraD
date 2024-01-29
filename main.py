@@ -9,12 +9,13 @@ from torch import optim
 import time
 import os
 import pandas as pd
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 CE = torch.nn.CrossEntropyLoss()
 def contrastive_loss(v1, v2):
-  logits = torch.matmul(v1,torch.transpose(v2, 0, 1))
-  labels = torch.arange(logits.shape[0], device=v1.device)
-  return CE(logits, labels) + CE(torch.transpose(logits, 0, 1), labels)
+    logits = torch.matmul(v1,torch.transpose(v2, 0, 1))
+    labels = torch.arange(logits.shape[0], device=v1.device)
+    return CE(logits, labels) + CE(torch.transpose(logits, 0, 1), labels)
 
 model_name = 'distilbert-base-uncased'
 tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -24,26 +25,61 @@ train_dataset = GraphTextDataset(root='./data/', gt=gt, split='train', tokenizer
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-nb_epochs = 5
+nb_epochs = 50
 batch_size = 32
 learning_rate = 2e-5
 
 val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
-model = Model(model_name=model_name, num_node_features=300, nout=768, nhid=300, graph_hidden_channels=300) # nout = bert model hidden dim
+#------ Default model ------#
+# model = Model(model_name=model_name, num_node_features=300, nout=768, nhid=300, graph_hidden_channels=300) # nout = bert model hidden dim
+
+#------ Model 2 ------#
+model = Model(
+    model_name=model_name,
+    num_node_features=300,
+    nout=768,
+    nhid=512,
+    graph_hidden_channels=[512, 512, 512],
+    heads=[4, 4, 4]
+)
+
+
+#------ Model Julie ------#
+# model = Model(
+#     model_name=model_name,
+#     num_node_features=300,
+#     nout=256,
+#     nhid=512,
+#     graph_hidden_channels=[500, 400, 300]
+# )
+
+
 model.to(device)
 
-optimizer = optim.AdamW(model.parameters(), lr=learning_rate,
-                                betas=(0.9, 0.999),
-                                weight_decay=0.01)
+optimizer = optim.AdamW(
+    model.parameters(),
+    lr=learning_rate,
+    betas=(0.9, 0.999),
+    weight_decay=0.01
+)
+
+scheduler = ReduceLROnPlateau(
+    optimizer,
+    mode='min',
+    factor=0.5,
+    patience=5,
+    verbose=True
+)
+
 
 epoch = 0
 loss = 0
 losses = []
 count_iter = 0
 time1 = time.time()
-printEvery = 50
+printEvery = 200
 best_validation_loss = 1000000
 
 for i in range(nb_epochs):
@@ -56,10 +92,12 @@ for i in range(nb_epochs):
         batch.pop('attention_mask')
         graph_batch = batch
         
-        x_graph, x_text = model(graph_batch.to(device), 
-                                input_ids.to(device), 
-                                attention_mask.to(device))
-        current_loss = contrastive_loss(x_graph, x_text)   
+        x_graph, x_text = model(
+            graph_batch.to(device),
+            input_ids.to(device),
+            attention_mask.to(device)
+        )
+        current_loss = contrastive_loss(x_graph, x_text)
         optimizer.zero_grad()
         current_loss.backward()
         optimizer.step()
@@ -68,28 +106,50 @@ for i in range(nb_epochs):
         count_iter += 1
         if count_iter % printEvery == 0:
             time2 = time.time()
-            print("Iteration: {0}, Time: {1:.4f} s, training loss: {2:.4f}".format(count_iter,
-                                                                        time2 - time1, loss/printEvery))
+            print(
+                "Iteration: {0}, Time: {1:.4f} s, training loss: {2:.4f}".format(
+                    count_iter,
+                    time2 - time1,
+                    loss/printEvery,
+                )
+            )
             losses.append(loss)
-            loss = 0 
+            loss = 0
+            
     model.eval()       
-    val_loss = 0        
+    val_loss = 0
     for batch in val_loader:
         input_ids = batch.input_ids
         batch.pop('input_ids')
         attention_mask = batch.attention_mask
         batch.pop('attention_mask')
         graph_batch = batch
-        x_graph, x_text = model(graph_batch.to(device), 
-                                input_ids.to(device), 
-                                attention_mask.to(device))
-        current_loss = contrastive_loss(x_graph, x_text)   
+        
+        x_graph, x_text = model(
+            graph_batch.to(device),
+            input_ids.to(device),
+            attention_mask.to(device))
+        current_loss = contrastive_loss(x_graph, x_text)
         val_loss += current_loss.item()
     best_validation_loss = min(best_validation_loss, val_loss)
-    print('-----EPOCH'+str(i+1)+'----- done.  Validation loss: ', str(val_loss/len(val_loader)) )
+    print(
+        "-----EPOCH {0}----- done.  Validation loss: {1:.4f}".format(
+            i+1,
+            val_loss/len(val_loader)
+        )
+    )
+    
+    if isinstance(scheduler, ReduceLROnPlateau):
+        scheduler.step(val_loss)
+    else:
+        scheduler.step()
+    current_lr = optimizer.param_groups[0]['lr']
+    print(f"Learning Rate: {current_lr}")
+    
     if best_validation_loss==val_loss:
-        print('validation loss improoved saving checkpoint...')
-        save_path = os.path.join('./', 'model'+str(i)+'.pt')
+        print('validation loss improved saving checkpoint...')
+        # save_path = os.path.join('./', 'model'+str(i)+'.pt')
+        save_path = os.path.join('./', 'modelv3.pt')
         torch.save({
         'epoch': i,
         'model_state_dict': model.state_dict(),
@@ -98,7 +158,6 @@ for i in range(nb_epochs):
         'loss': loss,
         }, save_path)
         print('checkpoint saved to: {}'.format(save_path))
-
 
 print('loading best model...')
 checkpoint = torch.load(save_path)
@@ -127,7 +186,6 @@ for batch in test_text_loader:
                              attention_mask=batch['attention_mask'].to(device)):
         text_embeddings.append(output.tolist())
 
-
 from sklearn.metrics.pairwise import cosine_similarity
 
 similarity = cosine_similarity(text_embeddings, graph_embeddings)
@@ -135,4 +193,4 @@ similarity = cosine_similarity(text_embeddings, graph_embeddings)
 solution = pd.DataFrame(similarity)
 solution['ID'] = solution.index
 solution = solution[['ID'] + [col for col in solution.columns if col!='ID']]
-solution.to_csv('submission.csv', index=False)
+solution.to_csv(f'submission_{val_loss:.4f}.csv', index=False)

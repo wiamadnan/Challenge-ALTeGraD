@@ -43,32 +43,32 @@ class GraphTextDataset(Dataset):
         pass
         
     def process_graph(self, raw_path):
-      edge_index  = []
-      x = []
-      with open(raw_path, 'r') as f:
-        next(f)
-        for line in f: 
-          if line != "\n":
-            edge = *map(int, line.split()), 
-            edge_index.append(edge)
-          else:
-            break
-        next(f)
-        for line in f: #get mol2vec features:
-          substruct_id = line.strip().split()[-1]
-          if substruct_id in self.gt.keys():
-            x.append(self.gt[substruct_id])
-          else:
-            x.append(self.gt['UNK'])
-        return torch.LongTensor(edge_index).T, torch.FloatTensor(x)
+        edge_index  = []
+        x = []
+        with open(raw_path, 'r') as f:
+            next(f)
+            for line in f:
+                if line != "\n":
+                    edge = *map(int, line.split()),
+                    edge_index.append(edge)
+                else:
+                    break
+            next(f)
+            for line in f: #get mol2vec features:
+                substruct_id = line.strip().split()[-1]
+                if substruct_id in self.gt.keys():
+                    x.append(self.gt[substruct_id])
+                else:
+                    x.append(self.gt['UNK'])
+            return torch.LongTensor(edge_index).T, torch.FloatTensor(x)
 
     def process(self):
         i = 0        
         for raw_path in self.raw_paths:
             cid = int(raw_path.split('/')[-1][:-6])
             text_input = self.tokenizer([self.description[1][cid]],
-                                   return_tensors="pt", 
-                                   truncation=True, 
+                                   return_tensors="pt",
+                                   truncation=True,
                                    max_length=256,
                                    padding="max_length",
                                    add_special_tokens=True,)
@@ -125,24 +125,24 @@ class GraphDataset(Dataset):
         pass
         
     def process_graph(self, raw_path):
-      edge_index  = []
-      x = []
-      with open(raw_path, 'r') as f:
-        next(f)
-        for line in f: 
-          if line != "\n":
-            edge = *map(int, line.split()), 
-            edge_index.append(edge)
-          else:
-            break
-        next(f)
-        for line in f:
-          substruct_id = line.strip().split()[-1]
-          if substruct_id in self.gt.keys():
-            x.append(self.gt[substruct_id])
-          else:
-            x.append(self.gt['UNK'])
-        return torch.LongTensor(edge_index).T, torch.FloatTensor(x)
+        edge_index  = []
+        x = []
+        with open(raw_path, 'r') as f:
+            next(f)
+            for line in f:
+                if line != "\n":
+                    edge = *map(int, line.split()),
+                    edge_index.append(edge)
+                else:
+                    break
+            next(f)
+            for line in f:
+                substruct_id = line.strip().split()[-1]
+                if substruct_id in self.gt.keys():
+                    x.append(self.gt[substruct_id])
+                else:
+                    x.append(self.gt['UNK'])
+            return torch.LongTensor(edge_index).T, torch.FloatTensor(x)
 
     def process(self):
         i = 0        
