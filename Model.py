@@ -1,5 +1,6 @@
 from torch import nn
 import torch.nn.functional as F
+import torch
 
 from torch_geometric.nn import GCNConv
 from torch_geometric.nn import global_mean_pool
@@ -152,21 +153,47 @@ class GraphEncoder(nn.Module):
         return x
 
 class TextEncoder(nn.Module):
-    def __init__(self, model_name):
+    def __init__(self, model_name='distilbert-base-uncased', pretrained_path='./distilbert_pretrained.bin', mean_pooling=False):
         super(TextEncoder, self).__init__()
         self.bert = AutoModel.from_pretrained(model_name)
-        #self.bert = AutoModelForMaskedLM.from_pretrained(model_name)
-        
+
+        if pretrained_path is not None:
+            pretrained_dict = torch.load(pretrained_path, map_location='cpu')
+            filtered_pretrained_dict = {
+                k[11:]: v for k, v in pretrained_dict.items() if k.startswith('distilbert.')
+            }
+            self.bert.load_state_dict(filtered_pretrained_dict, strict=False)%
+        self.mean_pooling = mean_pooling
+
     def forward(self, input_ids, attention_mask):
-        encoded_text = self.bert(input_ids, attention_mask=attention_mask)
-        #print(encoded_text.last_hidden_state.size())
-        return encoded_text.last_hidden_state[:,0,:]
+        encoded_text = self.bert(input_ids=input_ids, attention_mask=attention_mask)
+        
+        if not self.mean_pooling:
+            return outputs.last_hidden_state
+        
+        last_hidden_state = encoded_text.last_hidden_state
+        input_mask_expanded = attention_mask.unsqueeze(-1).expand(last_hidden_state.size()).float()
+        sum_embeddings = torch.sum(last_hidden_state * input_mask_expanded, 1)
+        sum_mask = torch.clamp(input_mask_expanded.sum(1), min=1e-9)
+        mean_pooled_output = sum_embeddings / sum_mask
+
+        return mean_pooled_output
     
 class Model(nn.Module):
-    def __init__(self, model_name, num_node_features, nout, nhid, graph_hidden_channels, heads):
+    def __init__(self, model_name, pretrained_path, num_node_features, nout, nhid, graph_hidden_channels, heads, mean_pooling=False):
         super(Model, self).__init__()
-        self.graph_encoder = GraphEncoder(num_node_features, nout, nhid, graph_hidden_channels, heads)
-        self.text_encoder = TextEncoder(model_name)
+        self.graph_encoder = GraphEncoder(
+            num_node_features,
+            nout,
+            nhid,
+            graph_hidden_channels,
+            heads
+        )
+        self.text_encoder = TextEncoder(
+            model_name=model_name,
+            pretrained_path=retrained_path,
+            mean_pooling=mean_pooling
+        )
         
     def forward(self, graph_batch, input_ids, attention_mask):
         graph_encoded = self.graph_encoder(graph_batch)
@@ -178,3 +205,5 @@ class Model(nn.Module):
     
     def get_graph_encoder(self):
         return self.graph_encoder
+
+

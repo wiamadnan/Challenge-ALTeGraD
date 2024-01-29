@@ -44,7 +44,7 @@ model.to(device)
 
 optimizer = torch.optim.AdamW(
     model.parameters(),
-    lr=5e-5
+    lr=learning_rate
 )
 
 total_steps = len(train_loader) * epochs
@@ -92,4 +92,10 @@ for epoch in range(epochs):  # Number of epochs
         print(f"Validation loss decreased ({min_val_loss:.4f} --> {avg_val_loss:.4f}). Saving model...")
         min_val_loss = avg_val_loss
         # Save the model
-        torch.save(model.state_dict(), './distilbert_pretrained.bin')
+        torch.save(model.state_dict(), './distilbert_pretrained2.bin')
+        
+        # Save only the base DistilBert model
+        base_model_state_dict = {
+            k[len('distilbert.'):]: v for k, v in model.state_dict().items() if k.startswith('distilbert.')
+        }
+        torch.save(base_model_state_dict, f'./{model_name}.bin')
