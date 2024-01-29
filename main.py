@@ -29,22 +29,18 @@ nb_epochs = 50
 batch_size = 32
 learning_rate = 2e-5
 
-val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
+val_loader = DataLoader(
+    val_dataset, batch_size=batch_size, shuffle=True)
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
 #------ Default model ------#
-# model = Model(model_name=model_name, num_node_features=300, nout=768, nhid=300, graph_hidden_channels=300) # nout = bert model hidden dim
-
-#------ Model 2 ------#
-model = Model(
-    model_name=model_name,
-    num_node_features=300,
-    nout=768,
-    nhid=512,
-    graph_hidden_channels=[512, 512, 512],
-    heads=[4, 4, 4]
-)
-
+# model = Model(
+#     model_name=model_name,
+#     num_node_features=300,
+#     nout=768,
+#     nhid=300,
+#     graph_hidden_channels=300
+# ) # nout = bert model hidden dim
 
 #------ Model Julie ------#
 # model = Model(
@@ -55,6 +51,15 @@ model = Model(
 #     graph_hidden_channels=[500, 400, 300]
 # )
 
+#------ Model v2 ------#
+model = Model(
+    model_name=model_name,
+    num_node_features=300,
+    nout=768,
+    nhid=512,
+    graph_hidden_channels=[512, 512, 512],
+    heads=[4, 4, 4]
+)
 
 model.to(device)
 
@@ -72,7 +77,6 @@ scheduler = ReduceLROnPlateau(
     patience=5,
     verbose=True
 )
-
 
 epoch = 0
 loss = 0
