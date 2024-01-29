@@ -18,6 +18,7 @@ def contrastive_loss(v1, v2):
     return CE(logits, labels) + CE(torch.transpose(logits, 0, 1), labels)
 
 model_name = 'distilbert-base-uncased'
+pretrained_path = './distilbert-base-uncased.bin'
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 gt = np.load("./data/token_embedding_dict.npy", allow_pickle=True)[()]
 val_dataset = GraphTextDataset(root='./data/', gt=gt, split='val', tokenizer=tokenizer)
@@ -53,6 +54,7 @@ train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 #------ Model v2 ------#
 model = Model(
     model_name=model_name,
+    pretrained_path=pretrained_path,
     num_node_features=300,
     nout=768,
     nhid=512,
@@ -153,7 +155,7 @@ for i in range(nb_epochs):
     if best_validation_loss==val_loss:
         print('validation loss improved saving checkpoint...')
         # save_path = os.path.join('./', 'model'+str(i)+'.pt')
-        save_path = os.path.join('./', 'modelv3.pt')
+        save_path = os.path.join('./', 'model-gat-bert.pt')
         torch.save({
         'epoch': i,
         'model_state_dict': model.state_dict(),

@@ -153,7 +153,7 @@ class GraphEncoder(nn.Module):
         return x
 
 class TextEncoder(nn.Module):
-    def __init__(self, model_name='distilbert-base-uncased', pretrained_path='./distilbert_pretrained.bin', mean_pooling=False):
+    def __init__(self, model_name, pretrained_path, mean_pooling=False):
         super(TextEncoder, self).__init__()
         self.bert = AutoModel.from_pretrained(model_name)
 
@@ -162,14 +162,14 @@ class TextEncoder(nn.Module):
             filtered_pretrained_dict = {
                 k[11:]: v for k, v in pretrained_dict.items() if k.startswith('distilbert.')
             }
-            self.bert.load_state_dict(filtered_pretrained_dict, strict=False)%
+            self.bert.load_state_dict(filtered_pretrained_dict, strict=False)    
         self.mean_pooling = mean_pooling
 
     def forward(self, input_ids, attention_mask):
         encoded_text = self.bert(input_ids=input_ids, attention_mask=attention_mask)
         
         if not self.mean_pooling:
-            return outputs.last_hidden_state
+            return encoded_text.last_hidden_state[:,0,:]
         
         last_hidden_state = encoded_text.last_hidden_state
         input_mask_expanded = attention_mask.unsqueeze(-1).expand(last_hidden_state.size()).float()
@@ -180,7 +180,17 @@ class TextEncoder(nn.Module):
         return mean_pooled_output
     
 class Model(nn.Module):
-    def __init__(self, model_name, pretrained_path, num_node_features, nout, nhid, graph_hidden_channels, heads, mean_pooling=False):
+    def __init__(
+        self,
+        num_node_features,
+        nout,
+        nhid,
+        graph_hidden_channels,
+        heads,
+        model_name,
+        pretrained_path,
+        mean_pooling=False
+    ):
         super(Model, self).__init__()
         self.graph_encoder = GraphEncoder(
             num_node_features,
@@ -191,7 +201,7 @@ class Model(nn.Module):
         )
         self.text_encoder = TextEncoder(
             model_name=model_name,
-            pretrained_path=retrained_path,
+            pretrained_path=pretrained_path,
             mean_pooling=mean_pooling
         )
         
