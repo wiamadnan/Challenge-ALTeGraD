@@ -10,6 +10,8 @@ import time
 import os
 import pandas as pd
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.utils.tensorboard import SummaryWriter
+from datetime import datetime
 
 CE = torch.nn.CrossEntropyLoss()
 def contrastive_loss(v1, v2):
@@ -18,7 +20,7 @@ def contrastive_loss(v1, v2):
     return CE(logits, labels) + CE(torch.transpose(logits, 0, 1), labels)
 
 model_name = 'distilbert-base-uncased'
-pretrained_path = './distilbert-base-uncased.bin'
+pretrained_path = 'distilbert-base-uncased.bin'
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 gt = np.load("./data/token_embedding_dict.npy", allow_pickle=True)[()]
 val_dataset = GraphTextDataset(root='./data/', gt=gt, split='val', tokenizer=tokenizer)
@@ -52,25 +54,48 @@ train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 # )
 
 #------ Model v2 ------#
+# model = Model(
+#     model_name=model_name,
+#     pretrained_path=pretrained_path,
+#     num_node_features=300,
+#     nout=768,
+#     nhid=512,
+#     graph_hidden_channels=[512, 512, 512],
+#     heads=[4, 4, 4]
+# )
+
+#------ Model v3 ------#
 model = Model(
     model_name=model_name,
     pretrained_path=pretrained_path,
     num_node_features=300,
     nout=768,
-    nhid=512,
-    graph_hidden_channels=[512, 512, 512],
+    nhid=768,
+    graph_hidden_channels=[768, 768, 768],
     heads=[4, 4, 4]
 )
 
-model.to(device)
+# model.load_graph_encoder_weights('./best_model.pth')
 
+# Set up logging directories
+timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+log_dir_name = f"modelv3--gat--786--bert--pretrained--{learning_rate}--{timestamp}"
+tensorboard_dir = os.path.join('./logs/tensorboard', log_dir_name)
+save_dir = os.path.join('./logs/models', log_dir_name)
+os.makedirs(save_dir, exist_ok=True)
+os.makedirs(tensorboard_dir, exist_ok=True)
+
+# Initialize TensorBoard writer
+writer = SummaryWriter(log_dir=tensorboard_dir)
+
+# Model, optimizer, and scheduler setup
+model.to(device)
 optimizer = optim.AdamW(
     model.parameters(),
     lr=learning_rate,
     betas=(0.9, 0.999),
     weight_decay=0.01
 )
-
 scheduler = ReduceLROnPlateau(
     optimizer,
     mode='min',
@@ -104,6 +129,8 @@ for i in range(nb_epochs):
             attention_mask.to(device)
         )
         current_loss = contrastive_loss(x_graph, x_text)
+        writer.add_scalar('Loss/train', current_loss, count_iter)
+        
         optimizer.zero_grad()
         current_loss.backward()
         optimizer.step()
@@ -145,22 +172,25 @@ for i in range(nb_epochs):
         )
     )
     
+    current_lr = optimizer.param_groups[0]['lr']
+    print(f"Learning Rate: {current_lr}")
+    writer.add_scalar('Loss/val', val_loss/len(val_loader), i)
+    writer.add_scalar('Learning rate', current_lr, i)
+    
     if isinstance(scheduler, ReduceLROnPlateau):
         scheduler.step(val_loss)
     else:
         scheduler.step()
-    current_lr = optimizer.param_groups[0]['lr']
-    print(f"Learning Rate: {current_lr}")
     
     if best_validation_loss==val_loss:
         print('validation loss improved saving checkpoint...')
         # save_path = os.path.join('./', 'model'+str(i)+'.pt')
-        save_path = os.path.join('./', 'model-gat-bert.pt')
+        save_path = os.path.join(save_dir, 'best_model.pth.pt')
         torch.save({
         'epoch': i,
         'model_state_dict': model.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),
-        'validation_accuracy': val_loss,
+        'validation_accuracy': val_loss/len(val_loader),
         'loss': loss,
         }, save_path)
         print('checkpoint saved to: {}'.format(save_path))
@@ -199,4 +229,7 @@ similarity = cosine_similarity(text_embeddings, graph_embeddings)
 solution = pd.DataFrame(similarity)
 solution['ID'] = solution.index
 solution = solution[['ID'] + [col for col in solution.columns if col!='ID']]
-solution.to_csv(f'submission_{val_loss:.4f}.csv', index=False)
+solution.to_csv(f'submission_{best_validation_loss:.4f}.csv', index=False)
+
+# Close TensorBoard writer
+writer.close()
