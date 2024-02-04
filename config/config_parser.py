@@ -12,7 +12,7 @@ def parse_args():
     
     # Load YAML config
     yaml_config = load_yaml_config(args.load_config)
-    
+
     # Print the loaded YAML configuration
     print("Loaded YAML configuration:", yaml_config)
     

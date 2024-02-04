@@ -48,13 +48,15 @@ model.to(device)
 # Set up logging directories
 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 log_dir_name = f"{model_name}--{learning_rate}--{timestamp}"
-tensorboard_dir = os.path.join('./logs/tensorboard', log_dir_name)
-save_dir = os.path.join('./logs/models', log_dir_name)
-os.makedirs(save_dir, exist_ok=True)
-os.makedirs(tensorboard_dir, exist_ok=True)
+
+args['save_dir'] = os.path.join(args['save_dir'], log_dir_name)
+args['tensorboard_dir'] = os.path.join(args['tensorboard_dir'], log_dir_name)
+
+os.makedirs(args['save_dir'], exist_ok=True)
+os.makedirs(args['tensorboard_dir'], exist_ok=True)
 
 # Initialize TensorBoard writer
-writer = SummaryWriter(log_dir=tensorboard_dir)
+writer = SummaryWriter(log_dir=args['tensorboard_dir'])
 
 # Initialize the optimizer
 optimizer = optim.AdamW(
@@ -127,7 +129,7 @@ for i in range(nb_epochs):
         graph_batch = batch
         
         x_graph, x_text = model(
-            graph_batch.to(device),
+            (graph_batch.x.to(device), graph_batch.edge_index.to(device), graph_batch.batch.to(device)),
             input_ids.to(device),
             attention_mask.to(device))
         current_loss = contrastive_loss(x_graph, x_text)
@@ -153,7 +155,7 @@ for i in range(nb_epochs):
     if best_validation_loss==val_loss:
         print('validation loss improved saving checkpoint...')
         # save_path = os.path.join('./', 'model'+str(i)+'.pt')
-        save_path = os.path.join(save_dir, 'best_model.pth.pt')
+        save_path = os.path.join(args['save_dir'], 'best_model.pth.pt')
         torch.save(
             {
                 'epoch': i,
@@ -183,7 +185,7 @@ test_loader = DataLoader(test_cids_dataset, batch_size=batch_size, shuffle=False
 
 graph_embeddings = []
 for batch in test_loader:
-    for output in graph_model(batch.to(device)):
+    for output in graph_model((batch.x.to(device), batch.edge_index.to(device), batch.batch.to(device))):
         graph_embeddings.append(output.tolist())
 
 test_text_loader = TorchDataLoader(test_text_dataset, batch_size=batch_size, shuffle=False)

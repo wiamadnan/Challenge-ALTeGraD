@@ -1,7 +1,9 @@
 model_name: gat--768--bert
+save_dir: ./logs/models
+tensorboard_dir: ./logs/tensorboard
 
 text_model_name: distilbert-base-uncased
-pretrained_text_path: distilbert-base-uncased.bin
+pretrained_text_path: distilbert-base-uncased.bin # null
 pretrained_graph_path: null
 
 num_node_features: 300
