@@ -2,6 +2,7 @@ from dataloader import GraphTextDataset, GraphDataset, TextDataset
 from torch_geometric.data import DataLoader
 from torch.utils.data import DataLoader as TorchDataLoader
 from Model import Model
+from loss import contrastive_loss 
 import numpy as np
 from transformers import AutoTokenizer
 import torch
@@ -16,12 +17,6 @@ from config.config_parser import parse_args
 
 # Load configurations
 args = parse_args() 
-
-CE = torch.nn.CrossEntropyLoss()
-def contrastive_loss(v1, v2):
-    logits = torch.matmul(v1,torch.transpose(v2, 0, 1))
-    labels = torch.arange(logits.shape[0], device=v1.device)
-    return CE(logits, labels) + CE(torch.transpose(logits, 0, 1), labels)
 
 tokenizer = AutoTokenizer.from_pretrained(args['text_model_name'])
 gt = np.load("./data/token_embedding_dict.npy", allow_pickle=True)[()]
@@ -97,7 +92,7 @@ for i in range(nb_epochs):
         graph_batch = batch
         
         x_graph, x_text = model(
-            graph_batch.to(device),
+            (graph_batch.x.to(device), graph_batch.edge_index.to(device), graph_batch.batch.to(device)),
             input_ids.to(device),
             attention_mask.to(device)
         )
@@ -159,13 +154,16 @@ for i in range(nb_epochs):
         print('validation loss improved saving checkpoint...')
         # save_path = os.path.join('./', 'model'+str(i)+'.pt')
         save_path = os.path.join(save_dir, 'best_model.pth.pt')
-        torch.save({
-        'epoch': i,
-        'model_state_dict': model.state_dict(),
-        'optimizer_state_dict': optimizer.state_dict(),
-        'validation_accuracy': val_loss/len(val_loader),
-        'loss': loss,
-        }, save_path)
+        torch.save(
+            {
+                'epoch': i,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'validation_accuracy': val_loss/len(val_loader),
+                'loss': loss,
+            }, 
+            save_path
+        )
         print('checkpoint saved to: {}'.format(save_path))
 
 print('loading best model...')

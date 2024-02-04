@@ -33,7 +33,7 @@ from torch_geometric.nn import GCNConv, GINConv, GATConv, SAGEConv, SGConv, glob
 #         self.fc2 = nn.Linear(nhid, nout)
 
 #     def forward(self, graph_batch):
-#         x, edge_index, batch = graph_batch.x, graph_batch.edge_index, graph_batch.batch
+#         x, edge_index, batch = graph_batch
         
 #         # Apply GAT layers with ReLU and Dropout
 #         x = F.relu(self.batchnorm1(self.conv1(x, edge_index)))
@@ -145,7 +145,7 @@ class GraphEncoder(nn.Module):
         # self.fc2 = nn.Linear(nhid, nout)
 
     def forward(self, graph_batch):
-        x, edge_index, batch = graph_batch.x, graph_batch.edge_index, graph_batch.batch
+        x, edge_index, batch = graph_batch
         
         # Apply GAT layers with ReLU and Dropout
         x = F.relu(self.batchnorm1(self.conv1(x, edge_index)))
@@ -312,7 +312,7 @@ class Model(nn.Module):
 #                     layer.bias.data.fill_(0.0)
 
 #     def forward(self, graph_batch):
-#         x, edge_index, batch = graph_batch.x, graph_batch.edge_index, graph_batch.batch
+#         x, edge_index, batch = graph_batch
 #         xs = []
 #         for i in range(self.n_layers):
 #             x = self.convs[i](x, edge_index)
