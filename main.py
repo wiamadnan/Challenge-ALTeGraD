@@ -12,6 +12,10 @@ import pandas as pd
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
+from config.config_parser import parse_args
+
+# Load configurations
+args = parse_args() 
 
 CE = torch.nn.CrossEntropyLoss()
 def contrastive_loss(v1, v2):
@@ -19,67 +23,36 @@ def contrastive_loss(v1, v2):
     labels = torch.arange(logits.shape[0], device=v1.device)
     return CE(logits, labels) + CE(torch.transpose(logits, 0, 1), labels)
 
-model_name = 'distilbert-base-uncased'
-pretrained_path = 'distilbert-base-uncased.bin'
-tokenizer = AutoTokenizer.from_pretrained(model_name)
+tokenizer = AutoTokenizer.from_pretrained(args['text_model_name'])
 gt = np.load("./data/token_embedding_dict.npy", allow_pickle=True)[()]
 val_dataset = GraphTextDataset(root='./data/', gt=gt, split='val', tokenizer=tokenizer)
 train_dataset = GraphTextDataset(root='./data/', gt=gt, split='train', tokenizer=tokenizer)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-nb_epochs = 50
-batch_size = 32
-learning_rate = 2e-5
+batch_size = args['batch_size']
+learning_rate = args['learning_rate']
+nb_epochs = args['nb_epochs']
+model_name = args['model_name']
 
 val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
-#------ Default model ------#
-# model = Model(
-#     model_name=model_name,
-#     num_node_features=300,
-#     nout=768,
-#     nhid=300,
-#     graph_hidden_channels=300
-# ) # nout = bert model hidden dim
-
-#------ Model Julie ------#
-# model = Model(
-#     model_name=model_name,
-#     num_node_features=300,
-#     nout=256,
-#     nhid=512,
-#     graph_hidden_channels=[500, 400, 300]
-# )
-
-#------ Model v2 ------#
-# model = Model(
-#     model_name=model_name,
-#     pretrained_path=pretrained_path,
-#     num_node_features=300,
-#     nout=768,
-#     nhid=512,
-#     graph_hidden_channels=[512, 512, 512],
-#     heads=[4, 4, 4]
-# )
-
-#------ Model v3 ------#
 model = Model(
-    model_name=model_name,
-    pretrained_path=pretrained_path,
-    num_node_features=300,
-    nout=768,
-    nhid=768,
-    graph_hidden_channels=[768, 768, 768],
-    heads=[4, 4, 4]
+    text_model_name=args['text_model_name'],
+    pretrained_text_path=args['pretrained_text_path'],
+    num_node_features=args['num_node_features'],
+    nout=args['nout'],
+    nhid=args['nhid'],
+    graph_hidden_channels=args['graph_hidden_channels'],
+    heads=args['heads']
 )
-
-# model.load_graph_encoder_weights('./best_model.pth')
+model.load_graph_encoder_weights(args['pretrained_graph_path'])
+model.to(device)
 
 # Set up logging directories
 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-log_dir_name = f"modelv3--gat--786--bert--pretrained--{learning_rate}--{timestamp}"
+log_dir_name = f"{model_name}--{learning_rate}--{timestamp}"
 tensorboard_dir = os.path.join('./logs/tensorboard', log_dir_name)
 save_dir = os.path.join('./logs/models', log_dir_name)
 os.makedirs(save_dir, exist_ok=True)
@@ -88,22 +61,22 @@ os.makedirs(tensorboard_dir, exist_ok=True)
 # Initialize TensorBoard writer
 writer = SummaryWriter(log_dir=tensorboard_dir)
 
-# Model, optimizer, and scheduler setup
-model.to(device)
+# Initialize the optimizer
 optimizer = optim.AdamW(
     model.parameters(),
-    lr=learning_rate,
-    betas=(0.9, 0.999),
-    weight_decay=0.01
-)
-scheduler = ReduceLROnPlateau(
-    optimizer,
-    mode='min',
-    factor=0.5,
-    patience=5,
-    verbose=True
+    lr=args['learning_rate'],
+    betas=tuple(args['optimizer']['betas']),
+    weight_decay=args['optimizer']['weight_decay']
 )
 
+# Initialize the scheduler
+scheduler = ReduceLROnPlateau(
+    optimizer,
+    mode=args['scheduler']['mode'],
+    factor=args['scheduler']['factor'],
+    patience=args['scheduler']['patience'],
+    verbose=args['scheduler']['verbose']
+)
 
 epoch = 0
 loss = 0

@@ -11,109 +11,6 @@ from torch.nn.functional import normalize
 from torch.nn import Parameter, Sequential, Linear, BatchNorm1d
 from torch_geometric.nn import GCNConv, GINConv, GATConv, SAGEConv, SGConv, global_add_pool, global_mean_pool
 
-#------ Default Model ------#
-
-# class GraphEncoder(nn.Module):
-#     def __init__(self, num_node_features, nout, nhid, graph_hidden_channels):
-#         super(GraphEncoder, self).__init__()
-#         self.nhid = nhid
-#         self.nout = nout
-#         self.relu = nn.ReLU()
-#         self.ln = nn.LayerNorm((nout))
-#         self.conv1 = GCNConv(num_node_features, graph_hidden_channels)
-#         self.conv2 = GCNConv(graph_hidden_channels, graph_hidden_channels)
-#         self.conv3 = GCNConv(graph_hidden_channels, graph_hidden_channels)
-#         self.mol_hidden1 = nn.Linear(graph_hidden_channels, nhid)
-#         self.mol_hidden2 = nn.Linear(nhid, nout)
-
-#     def forward(self, graph_batch):
-#         x = graph_batch.x
-#         edge_index = graph_batch.edge_index
-#         batch = graph_batch.batch
-#         x = self.conv1(x, edge_index)
-#         x = x.relu()
-#         x = self.conv2(x, edge_index)
-#         x = x.relu()
-#         x = self.conv3(x, edge_index)
-#         x = global_mean_pool(x, batch)
-#         x = self.mol_hidden1(x).relu()
-#         x = self.mol_hidden2(x)
-#         return x
-
-#------ Model Julie ------#
-
-# class GraphEncoder(nn.Module):
-#     def __init__(self, num_node_features, nout, nhid, graph_hidden_channels):
-#         super(GraphEncoder, self).__init__()
-#         self.nhid = nhid
-#         self.nout = nout
-#         self.relu = nn.ReLU()
-
-#         self.conv1 = GCNConv(num_node_features, graph_hidden_channels[0])
-#         self.conv2 = GCNConv(graph_hidden_channels[0], graph_hidden_channels[1])
-#         self.conv3 = GCNConv(graph_hidden_channels[1], graph_hidden_channels[2])
-
-#         self.mol_hidden1 = nn.Linear(graph_hidden_channels[2], nhid)
-#         self.mol_hidden2 = nn.Linear(nhid, nout)
-
-#         self.batchnorm1 = nn.BatchNorm1d(graph_hidden_channels[0])
-#         self.batchnorm2 = nn.BatchNorm1d(graph_hidden_channels[1])
-#         self.batchnorm3 = nn.BatchNorm1d(graph_hidden_channels[2])
-#         self.batchnorm4 = nn.BatchNorm1d(graph_hidden_channels[2])
-
-#         self.dropout = nn.Dropout(0.1)
-
-#     def forward(self, graph_batch):
-#         x = graph_batch.x
-#         edge_index = graph_batch.edge_index
-#         batch = graph_batch.batch
-#         x = self.conv1(x, edge_index)
-#         x = x.relu()
-
-#         x = self.conv2(x, edge_index)
-#         x = self.batchnorm2(x)
-#         x = x.relu()
-
-#         x = self.conv3(x,edge_index)
-#         x = self.batchnorm4(x)
-#         x = x.relu()
-
-#         x = global_mean_pool(x, batch)
-        
-#         x = self.mol_hidden1(x).relu()
-#         x = self.dropout(x)
-#         x = self.mol_hidden2(x)
-
-#         return x
-    
-# class TextEncoder(nn.Module):
-#     def __init__(self, model_name):
-#         super(TextEncoder, self).__init__()
-#         self.bert = AutoModel.from_pretrained(model_name)
-#         #self.bert = AutoModelForMaskedLM.from_pretrained(model_name)
-        
-#     def forward(self, input_ids, attention_mask):
-#         encoded_text = self.bert(input_ids, attention_mask=attention_mask)
-#         #print(encoded_text.last_hidden_state.size())
-#         return encoded_text.last_hidden_state[:,0,:]
-    
-# class Model(nn.Module):
-#     def __init__(self, model_name, num_node_features, nout, nhid, graph_hidden_channels):
-#         super(Model, self).__init__()
-#         self.graph_encoder = GraphEncoder(num_node_features, nout, nhid, graph_hidden_channels)
-#         self.text_encoder = TextEncoder(model_name)
-        
-#     def forward(self, graph_batch, input_ids, attention_mask):
-#         graph_encoded = self.graph_encoder(graph_batch)
-#         text_encoded = self.text_encoder(input_ids, attention_mask)
-#         return graph_encoded, text_encoded
-    
-#     def get_text_encoder(self):
-#         return self.text_encoder
-    
-#     def get_graph_encoder(self):
-#         return self.graph_encoder
-
 #------ Model v2 ------#
 
 # class GraphEncoder(nn.Module):
@@ -156,12 +53,12 @@ from torch_geometric.nn import GCNConv, GINConv, GATConv, SAGEConv, SGConv, glob
 #         return x
 
 # class TextEncoder(nn.Module):
-#     def __init__(self, model_name, pretrained_path, mean_pooling=False):
+#     def __init__(self, text_model_name, pretrained_text_path, mean_pooling=False):
 #         super(TextEncoder, self).__init__()
-#         self.bert = AutoModel.from_pretrained(model_name)
+#         self.bert = AutoModel.from_pretrained(text_model_name)
 
-#         if pretrained_path is not None:
-#             pretrained_dict = torch.load(pretrained_path, map_location='cpu')
+#         if pretrained_text_path is not None:
+#             pretrained_dict = torch.load(pretrained_text_path, map_location='cpu')
 #             filtered_pretrained_dict = {
 #                 k[11:]: v for k, v in pretrained_dict.items() if k.startswith('distilbert.')
 #             }
@@ -190,8 +87,8 @@ from torch_geometric.nn import GCNConv, GINConv, GATConv, SAGEConv, SGConv, glob
 #         nhid,
 #         graph_hidden_channels,
 #         heads,
-#         model_name,
-#         pretrained_path=None,
+#         text_model_name,
+#         pretrained_text_path=None,
 #         mean_pooling=False
 #     ):
 #         super(Model, self).__init__()
@@ -203,8 +100,8 @@ from torch_geometric.nn import GCNConv, GINConv, GATConv, SAGEConv, SGConv, glob
 #             heads
 #         )
 #         self.text_encoder = TextEncoder(
-#             model_name=model_name,
-#             pretrained_path=pretrained_path,
+#             text_model_name=text_model_name,
+#             pretrained_text_path=pretrained_text_path,
 #             mean_pooling=mean_pooling
 #         )
         
@@ -260,20 +157,24 @@ class GraphEncoder(nn.Module):
 
         # Global mean pooling
         global_rep = global_mean_pool(x, batch)
+        
+        # Normalize the output
+        # global_rep = normalize(global_rep, p=2, dim=1)  # L2 normalization
+        
         global_rep = self.fc1(global_rep)
-#         global_rep = F.relu(self.fc1(global_rep))
-#         global_rep = self.dropout(global_rep)
-#         global_rep = self.fc2(global_rep)
+        # global_rep = F.relu(self.fc1(global_rep))
+        # global_rep = self.dropout(global_rep)
+        # global_rep = self.fc2(global_rep)
 
         return global_rep
 
 class TextEncoder(nn.Module):
-    def __init__(self, model_name, pretrained_path, mean_pooling=False):
+    def __init__(self, text_model_name, pretrained_text_path, mean_pooling=False):
         super(TextEncoder, self).__init__()
-        self.bert = AutoModel.from_pretrained(model_name)
+        self.bert = AutoModel.from_pretrained(text_model_name)
 
-        if pretrained_path is not None:
-            pretrained_dict = torch.load(pretrained_path, map_location='cpu')
+        if pretrained_text_path is not None:
+            pretrained_dict = torch.load(pretrained_text_path, map_location='cpu')
             filtered_pretrained_dict = {
                 k[11:]: v for k, v in pretrained_dict.items() if k.startswith('distilbert.')
             }
@@ -305,8 +206,8 @@ class Model(nn.Module):
         nhid,
         graph_hidden_channels,
         heads,
-        model_name,
-        pretrained_path=None,
+        text_model_name,
+        pretrained_text_path=None,
         mean_pooling=False
     ):
         super(Model, self).__init__()
@@ -318,8 +219,8 @@ class Model(nn.Module):
             heads=heads
         )
         self.text_encoder = TextEncoder(
-            model_name=model_name,
-            pretrained_path=pretrained_path,
+            text_model_name=text_model_name,
+            pretrained_text_path=pretrained_text_path,
             mean_pooling=mean_pooling
         )
         
@@ -334,13 +235,15 @@ class Model(nn.Module):
     def get_graph_encoder(self):
         return self.graph_encoder
     
-    def load_graph_encoder_weights(self, weights_path):
+    def load_graph_encoder_weights(self, weights_path=None):
         """
         Load weights into the graph encoder part of the model.
 
         Args:
             weights_path (str): Path to the file containing the graph encoder weights.
         """
+        if weights_path == None:
+            return
         graph_encoder_state_dict = torch.load(weights_path, map_location='cpu')
         if 'state_dict' in graph_encoder_state_dict:  # Handle nested dictionaries
             graph_encoder_state_dict = graph_encoder_state_dict['state_dict']
@@ -353,13 +256,13 @@ class Model(nn.Module):
 # class TextEncoder(nn.Module):
 #     def __init__(
 #         self,
-#         model_name='recobo/chemical-bert-uncased',
-#         pretrained_path=None,
+#         text_model_name='recobo/chemical-bert-uncased',
+#         pretrained_text_path=None,
 #         mean_pooling=False
 #     ):
 #         super(TextEncoder, self).__init__()
-#         self.model_name = model_name
-#         self.bert = AutoModel.from_pretrained(model_name)
+#         self.text_model_name = text_model_name
+#         self.bert = AutoModel.from_pretrained(text_model_name)
         
 #     def forward(self, input_ids, attention_mask):
 #         encoded_text = self.bert(input_ids=input_ids, attention_mask=attention_mask)

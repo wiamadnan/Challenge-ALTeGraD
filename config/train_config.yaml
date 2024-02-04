@@ -1,0 +1,25 @@
+model_name: gat--768--bert
+
+text_model_name: distilbert-base-uncased
+pretrained_text_path: distilbert-base-uncased.bin
+pretrained_graph_path: ./best_model.pth
+
+num_node_features: 300
+nout: 768
+nhid: 768
+graph_hidden_channels: [768, 768, 768]
+heads: [4, 4, 4]
+
+batch_size: 32
+learning_rate: 0.00002
+nb_epochs: 50
+
+optimizer:
+  betas: [0.9, 0.999]
+  weight_decay: 0.01
+
+scheduler:
+  mode: min
+  factor: 0.5
+  patience: 5
+  verbose: true
