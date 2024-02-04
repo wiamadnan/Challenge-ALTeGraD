@@ -102,8 +102,6 @@ class GraphEncoder(nn.Module):
 
         # Global mean pooling
         global_rep = global_mean_pool(x, batch)
-        
-        global_rep = self.fc1(global_rep)
         global_rep = F.relu(self.fc1(global_rep))
         global_rep = self.dropout(global_rep)
         global_rep = self.fc2(global_rep)
