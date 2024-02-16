@@ -1,0 +1,33 @@
+model_name: gat--768--bert
+save_dir: ./logs/models
+tensorboard_dir: ./logs/tensorboard
+
+text_model_name: distilbert-base-uncased
+pretrained_text_path: distilbert-base-uncased.bin
+pretrained_graph_path: ./best_model.pth
+
+augment_list: ["node_dropping", "node_attr_mask"]
+loss: null  
+
+num_node_features: 300
+feat_dim: 300
+nout: 768
+nhid: 768
+graph_hidden_channels: [768, 768, 768]
+heads: [4, 4, 4]
+
+train_data_percent: 1.0
+batch_size: 32
+lr: 0.00002
+epochs: 50
+num_workers: 2
+
+optimizer:
+  betas: [0.9, 0.999]
+  weight_decay: 0.01
+
+scheduler:
+  mode: min
+  factor: 0.5
+  patience: 5
+  verbose: true
